@@ -1,3 +1,28 @@
+# Sveltia CMS — a UX-focused fork
+
+> A friendly fork of [Sveltia CMS](https://github.com/sveltia/sveltia-cms) by **[Wellington Mota](https://github.com/wellmota)**, a product/UX designer. I use Sveltia in production and love it — this fork is where I prototype experience-level improvements and give them back to the project.
+
+Sveltia is already fast and developer-friendly. My contributions focus on the **human side** of the editing experience: the people who actually write, on the devices they actually use, increasingly with an AI sitting next to them.
+
+### What I'm working on
+
+- 📱 **Mobile-first editing** — treating the phone as a primary place to write and publish, not an afterthought: comfortable tap targets, sane scrolling, and forms that hold up on a small screen.
+- ✍️ **Human-writer-friendly UI** — fewer sharp edges for non-technical authors. Clearer labels, calmer layouts, and defaults that let someone focus on the words instead of the tool.
+- ♿ **Accessibility & responsiveness** — keyboard flows, focus states, contrast, and layouts that adapt gracefully from desktop to mobile.
+- 🤖 **AI-assisted content teams** — making the CMS pleasant for teams that draft with AI: smoother paste/cleanup of generated content and an editing surface that plays well with an assistant in the loop.
+
+### Roadmap (experience track)
+
+- [ ] **MCP integration** — let an agent (Claude or equivalent) draft, edit, and stage entries directly through the CMS via the [Model Context Protocol](https://modelcontextprotocol.io/), with the human staying in control of review and publish.
+- [ ] Refined mobile editing flows and review-on-the-go.
+- [ ] Friendlier onboarding and microcopy for non-technical authors.
+
+These are personal experiments — anything that proves itself here, I'd love to clean up and propose upstream. Issues and ideas are welcome.
+
+---
+
+> Everything below is the upstream README, kept intact.
+
 # Sveltia CMS
 
 [Sveltia CMS](https://sveltiacms.app/en/) is a free, open-source, Git-based headless content management system for [Jamstack](https://jamstack.org/) sites. It’s a complete rewrite of Netlify CMS, now known as Decap CMS.
