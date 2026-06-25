@@ -22,7 +22,8 @@ const nav = [
     active: path.startsWith(`/admin/${c.name}`),
   })),
   { label: 'Mídia', href: '/admin/midia', active: path.startsWith('/admin/midia') },
-  ...(config.singletons?.length ? [{ label: 'Páginas', href: '/admin/paginas', active: path.startsWith('/admin/paginas') }] : []),
+  // 'Páginas' (singletons) oculto por enquanto. Pra reexibir, descomente:
+  // ...(config.singletons?.length ? [{ label: 'Páginas', href: '/admin/paginas', active: path.startsWith('/admin/paginas') }] : []),
 ];
 const linkBase = 'block rounded-lg px-3 py-2 text-sm font-medium transition';
 ---
