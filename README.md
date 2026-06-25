@@ -11,13 +11,24 @@ Sveltia is already fast and developer-friendly. My contributions focus on the **
 - ♿ **Accessibility & responsiveness** — keyboard flows, focus states, contrast, and layouts that adapt gracefully from desktop to mobile.
 - 🤖 **AI-assisted content teams** — making the CMS pleasant for teams that draft with AI: smoother paste/cleanup of generated content and an editing surface that plays well with an assistant in the loop.
 
+### UX patterns I've shipped (validated in a production CMS)
+
+These are interaction patterns I've designed and shipped for a real editorial team, and want to bring to Sveltia. The exact code lives in a different stack, but the design intent is what I'm contributing here:
+
+- 🧷 **Floating save bar** — a sticky action bar pinned to the bottom of the editor so you can save from anywhere without scrolling. Shows live draft/published status, a "Saving…" state, and a ⌘/Ctrl+S shortcut.
+- 🔔 **Toast feedback** — non-blocking toasts (auto-dismiss + manual close) instead of inline banners that push content around.
+- 🖼️ **Media reuse everywhere** — one media library that the image fields *and* the rich-text editor both pull from: pick an existing asset (with search) or upload inline, and it's instantly available in the body.
+- 📝 **Rich Markdown editor** — toolbar + live/side-by-side preview, with the image button wired straight to the media library.
+- 📊 **Content dashboard** — a home with content KPIs, recent activity, and shortcuts, so editors land on signal instead of a raw list.
+- 🩹 **Small reliability touches** — stable image preview on upload (no flicker/revert), non-cropping data tables, and instant client-side search/filter on long lists.
+
 ### Roadmap (experience track)
 
 - [ ] **MCP integration** — let an agent (Claude or equivalent) draft, edit, and stage entries directly through the CMS via the [Model Context Protocol](https://modelcontextprotocol.io/), with the human staying in control of review and publish.
 - [ ] Refined mobile editing flows and review-on-the-go.
 - [ ] Friendlier onboarding and microcopy for non-technical authors.
 
-These are personal experiments — anything that proves itself here, I'd love to clean up and propose upstream. Issues and ideas are welcome.
+These are personal experiments — anything that proves itself, I'd love to clean up and propose upstream. Issues and ideas are welcome.
 
 ---
 
