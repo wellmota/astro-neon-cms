@@ -1,0 +1,58 @@
+---
+/**
+ * Toast de feedback (canto inferior direito). Auto-some após `duration` ms e
+ * tem botão de fechar. Renderize condicionalmente: {ok==='salvo' && <Toast .../>}.
+ */
+interface Props {
+  message: string;
+  type?: 'success' | 'error' | 'info';
+  /** ms até sumir sozinho; 0 = fica até fechar no X */
+  duration?: number;
+}
+const { message, type = 'success', duration = 4500 } = Astro.props;
+const tone = {
+  success: 'border-green-800/70 bg-green-950/90 text-green-200',
+  error: 'border-red-800/70 bg-red-950/90 text-red-200',
+  info: 'border-neutral-700 bg-neutral-900/95 text-neutral-200',
+}[type];
+---
+
+<div
+  data-toast
+  data-duration={duration}
+  role="status"
+  aria-live="polite"
+  class={`fixed bottom-5 right-5 z-[70] flex max-w-sm translate-y-2 items-start gap-3 rounded-xl border ${tone} px-4 py-3 text-sm opacity-0 shadow-2xl backdrop-blur transition-all duration-300 motion-reduce:transition-none`}
+>
+  <span class="flex-1 leading-snug">{message}</span>
+  <button
+    data-toast-close
+    type="button"
+    aria-label="Fechar"
+    class="-mr-1 -mt-0.5 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-inherit opacity-70 transition-colors hover:bg-white/10 hover:opacity-100"
+  >
+    <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+  </button>
+</div>
+
+<script>
+  document.querySelectorAll<HTMLElement>('[data-toast]').forEach((t, i) => {
+    if (t.dataset.wired) return;
+    t.dataset.wired = '1';
+    // empilha se houver mais de um
+    t.style.bottom = `${1.25 + i * 4}rem`;
+
+    const dismiss = () => {
+      t.style.opacity = '0';
+      t.style.transform = 'translateY(0.5rem)';
+      setTimeout(() => t.remove(), 320);
+    };
+    requestAnimationFrame(() => {
+      t.style.opacity = '1';
+      t.style.transform = 'translateY(0)';
+    });
+    t.querySelector('[data-toast-close]')?.addEventListener('click', dismiss);
+    const dur = Number(t.dataset.duration ?? 0);
+    if (dur > 0) setTimeout(dismiss, dur);
+  });
+</script>

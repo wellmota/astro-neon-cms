@@ -1,0 +1,144 @@
+---
+/**
+ * Seletor de mídia reutilizável (modal). Renderize UMA vez por página.
+ * Abre via `window.openMediaPicker((url) => { ... })` — usado pelos campos de
+ * imagem (ImageField) e pelo botão de imagem do editor de Markdown.
+ * Lista os arquivos do Vercel Blob em /api/admin/midia/list.json e permite
+ * enviar uma nova imagem ali mesmo.
+ */
+---
+
+<div id="media-picker" class="fixed inset-0 z-50 hidden" role="dialog" aria-modal="true" aria-label="Biblioteca de mídia">
+  <div data-mp-backdrop class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
+  <div class="absolute inset-x-4 top-[5vh] mx-auto flex max-h-[85vh] max-w-4xl flex-col overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950 shadow-2xl">
+    <div class="flex items-center gap-3 border-b border-neutral-800 p-4">
+      <h2 class="text-sm font-semibold text-neutral-100">Biblioteca de mídia</h2>
+      <input
+        data-mp-search
+        type="search"
+        placeholder="Buscar…"
+        class="ml-auto w-56 rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-sm text-neutral-100 outline-none transition placeholder:text-neutral-500 focus:border-[#3b6fe0] focus:ring-2 focus:ring-[#0040C8]/35"
+      />
+      <button data-mp-close type="button" aria-label="Fechar" class="flex size-8 cursor-pointer items-center justify-center rounded-md text-neutral-400 transition-colors hover:bg-neutral-800 hover:text-neutral-100">
+        <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div data-mp-body class="grid min-h-[200px] grid-cols-3 gap-3 overflow-y-auto p-4 sm:grid-cols-4 md:grid-cols-5">
+      <p data-mp-status class="col-span-full py-8 text-center text-sm text-neutral-500">Carregando…</p>
+    </div>
+    <div class="border-t border-neutral-800 p-3 text-center">
+      <label class="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-xs font-medium text-neutral-300 transition-colors hover:bg-neutral-800">
+        <span data-mp-upload-label>Enviar nova imagem</span>
+        <input data-mp-upload type="file" accept="image/*" hidden />
+      </label>
+    </div>
+  </div>
+</div>
+
+<script>
+  import { upload } from '@vercel/blob/client';
+
+  type Item = { url: string; pathname: string; size: number };
+  const root = document.getElementById('media-picker')!;
+  const body = root.querySelector<HTMLElement>('[data-mp-body]')!;
+  const status = root.querySelector<HTMLElement>('[data-mp-status]')!;
+  const search = root.querySelector<HTMLInputElement>('[data-mp-search]')!;
+  const uploadInput = root.querySelector<HTMLInputElement>('[data-mp-upload]')!;
+  const uploadLabel = root.querySelector<HTMLElement>('[data-mp-upload-label]')!;
+
+  let onSelect: ((url: string) => void) | null = null;
+  let items: Item[] = [];
+
+  const basename = (p: string) => p.split('/').pop() ?? p;
+
+  function open() {
+    root.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    search.value = '';
+  }
+  function close() {
+    root.classList.add('hidden');
+    document.body.style.overflow = '';
+    onSelect = null;
+  }
+
+  function render(filter = '') {
+    const term = filter.trim().toLowerCase();
+    const list = term ? items.filter((it) => basename(it.pathname).toLowerCase().includes(term)) : items;
+    body.replaceChildren();
+    if (!list.length) {
+      const p = document.createElement('p');
+      p.className = 'col-span-full py-8 text-center text-sm text-neutral-500';
+      p.textContent = items.length ? 'Nenhum resultado.' : 'Nenhuma imagem ainda. Envie a primeira abaixo.';
+      body.appendChild(p);
+      return;
+    }
+    for (const it of list) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.title = basename(it.pathname);
+      btn.className = 'group relative aspect-square cursor-pointer overflow-hidden rounded-lg border border-neutral-800 bg-neutral-900 transition-colors hover:border-[#3b6fe0]';
+      const img = document.createElement('img');
+      img.src = it.url;
+      img.alt = basename(it.pathname);
+      img.loading = 'lazy';
+      img.className = 'h-full w-full object-cover';
+      btn.appendChild(img);
+      btn.addEventListener('click', () => {
+        onSelect?.(it.url);
+        close();
+      });
+      body.appendChild(btn);
+    }
+  }
+
+  async function load() {
+    if (!items.length) {
+      body.replaceChildren(status);
+      status.textContent = 'Carregando…';
+    }
+    try {
+      // Cache-busting: sempre pega a lista atual (imagem enviada em outra aba
+      // aparece sem precisar recarregar a página).
+      const res = await fetch('/api/admin/midia/list.json', { cache: 'no-store' });
+      const data = await res.json();
+      items = data.items ?? [];
+      render(search.value);
+    } catch {
+      status.textContent = 'Falha ao carregar a biblioteca.';
+    }
+  }
+
+  (window as any).openMediaPicker = (cb: (url: string) => void) => {
+    onSelect = cb;
+    open();
+    load(); // re-busca a cada abertura (nunca usa lista obsoleta)
+  };
+
+  root.querySelector('[data-mp-close]')?.addEventListener('click', close);
+  root.querySelector('[data-mp-backdrop]')?.addEventListener('click', close);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !root.classList.contains('hidden')) close();
+  });
+  search.addEventListener('input', () => render(search.value));
+
+  uploadInput.addEventListener('change', async () => {
+    const file = uploadInput.files?.[0];
+    if (!file) return;
+    const original = uploadLabel.textContent;
+    uploadLabel.textContent = 'Enviando…';
+    try {
+      const blob = await upload(file.name, file, { access: 'public', handleUploadUrl: '/api/admin/upload' });
+      // recarrega a lista e já seleciona a recém-enviada
+      await load();
+      onSelect?.(blob.url);
+      close();
+    } catch (e) {
+      uploadLabel.textContent = 'Falha. Tente de novo';
+      setTimeout(() => (uploadLabel.textContent = original), 1500);
+    } finally {
+      uploadInput.value = '';
+      if (uploadLabel.textContent === 'Enviando…') uploadLabel.textContent = original;
+    }
+  });
+</script>

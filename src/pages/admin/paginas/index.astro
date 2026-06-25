@@ -1,0 +1,27 @@
+---
+export const prerender = false;
+import AdminLayout from '@/layouts/AdminLayout.astro';
+import { config } from '@/lib/cms';
+
+const user = Astro.locals.user!;
+const singletons = config.singletons ?? [];
+const card = 'rounded-xl border border-neutral-800 bg-neutral-900/60 p-4';
+---
+
+<AdminLayout title="Páginas" user={user} wide>
+  <h1 class="mb-1 text-xl font-bold tracking-tight">Páginas</h1>
+  <p class="mb-6 text-sm text-neutral-400">Textos fixos (singletons).</p>
+
+  {singletons.length === 0 ? (
+    <p class="text-sm text-neutral-400">Nenhuma página declarada no config.</p>
+  ) : (
+    <div class="grid gap-3 sm:grid-cols-2">
+      {singletons.map((s) => (
+        <a href={`/admin/paginas/${s.key}`} class={`${card} transition-colors hover:border-neutral-700 hover:bg-neutral-900`}>
+          <p class="text-sm font-medium text-neutral-100">{s.label}</p>
+          <p class="mt-1 text-xs text-neutral-500">{s.fields.length} campo(s)</p>
+        </a>
+      ))}
+    </div>
+  )}
+</AdminLayout>

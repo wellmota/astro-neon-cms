@@ -1,0 +1,102 @@
+---
+export const prerender = false;
+import AdminLayout from '@/layouts/AdminLayout.astro';
+import Toast from '@/components/admin/Toast.astro';
+import { getCollection, siteUrl, titleOf } from '@/lib/cms';
+import { listForAdmin } from '@/lib/entries';
+
+const user = Astro.locals.user!;
+const { collection } = Astro.params;
+const col = getCollection(collection!);
+if (!col) return Astro.redirect('/admin');
+
+const all = await listForAdmin(col.name);
+const ok = Astro.url.searchParams.get('ok');
+const filtro = Astro.url.searchParams.get('filtro') ?? 'todos';
+
+const rows = all.filter((e) =>
+  filtro === 'publicados' ? !e.draft : filtro === 'rascunhos' ? e.draft : filtro === 'destaques' ? e.featured : true,
+);
+
+const filtros = [
+  { key: 'todos', label: 'Todos', n: all.length },
+  { key: 'publicados', label: 'Publicados', n: all.filter((e) => !e.draft).length },
+  { key: 'rascunhos', label: 'Rascunhos', n: all.filter((e) => e.draft).length },
+  ...(col.featurable ? [{ key: 'destaques', label: 'Destaques', n: all.filter((e) => e.featured).length }] : []),
+];
+
+const fmt = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short' });
+const pill = 'rounded-full px-3 py-1 text-sm font-medium transition';
+const base = `/admin/${col.name}`;
+const singular = col.labelSingular ?? col.label;
+---
+
+<AdminLayout title={col.label} user={user} wide>
+  <div class="mb-6 flex items-center justify-between">
+    <h1 class="text-xl font-bold tracking-tight">{col.label}</h1>
+    <a href={`${base}/novo`} class="rounded-lg bg-[#0040C8] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1b50d6]">Novo: {singular.toLowerCase()}</a>
+  </div>
+
+  {ok === 'salvo' && <Toast message="Salvo. Se não estiver como rascunho, já aparece na API/site." />}
+  {ok === 'excluido' && <Toast message="Excluído." type="info" />}
+
+  <div class="mb-4 flex flex-wrap items-center gap-2">
+    {filtros.map((f) => (
+      <a href={f.key === 'todos' ? base : `${base}?filtro=${f.key}`} class={`${pill} ${filtro === f.key ? 'bg-[#0040C8] text-white' : 'bg-neutral-900 text-neutral-400 hover:text-neutral-100'}`}>
+        {f.label} <span class="opacity-60">{f.n}</span>
+      </a>
+    ))}
+    <input type="search" id="cms-search" placeholder="Buscar…" class="ml-auto w-64 rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-sm text-neutral-100 outline-none transition placeholder:text-neutral-500 focus:border-[#3b6fe0] focus:ring-2 focus:ring-[#0040C8]/35" />
+  </div>
+
+  {rows.length === 0 ? (
+    <p class="text-neutral-400">Nada neste filtro.</p>
+  ) : (
+    <div class="overflow-x-auto rounded-xl border border-neutral-800 bg-neutral-900/40">
+      <table class="w-full min-w-[640px] text-sm">
+        <thead class="border-b border-neutral-800 bg-neutral-900/80 text-left text-neutral-400">
+          <tr>
+            <th class="w-1/2 px-4 py-2.5 font-medium">Título</th>
+            <th class="whitespace-nowrap px-4 py-2.5 font-medium">Status</th>
+            <th class="whitespace-nowrap px-4 py-2.5 font-medium">Editado por</th>
+            <th class="whitespace-nowrap px-4 py-2.5 font-medium">Quando</th>
+            <th class="px-4 py-2.5" />
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((e) => (
+            <tr class="group border-t border-neutral-800/70 hover:bg-neutral-900/60" data-search={titleOf(col, e.data).toLowerCase()}>
+              <td class="px-4 py-2.5"><a href={`${base}/${e.id}`} class="font-medium text-neutral-100 hover:text-[#7aa0ff]">{titleOf(col, e.data)}</a></td>
+              <td class="whitespace-nowrap px-4 py-2.5">
+                {e.draft
+                  ? <span class="rounded bg-amber-950/60 px-2 py-0.5 text-xs font-medium text-amber-300">Rascunho</span>
+                  : <span class="rounded bg-green-950/60 px-2 py-0.5 text-xs font-medium text-green-300">Publicado</span>}
+                {e.featured && <span class="ml-1 rounded bg-[#0040C8]/20 px-2 py-0.5 text-xs font-medium text-[#7aa0ff]">Destaque</span>}
+              </td>
+              <td class="whitespace-nowrap px-4 py-2.5 text-neutral-400">{e.updated_by_name ?? '—'}</td>
+              <td class="whitespace-nowrap px-4 py-2.5 text-neutral-500">{fmt.format(new Date(e.updated_at))}</td>
+              <td class="px-4 py-2.5 text-right whitespace-nowrap">
+                <span class="inline-flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
+                  {!e.draft && siteUrl && (
+                    <a href={`${siteUrl}/${col.name}/${e.slug}`} target="_blank" rel="noopener" class="rounded-md border border-neutral-700 px-2 py-1 text-xs text-neutral-300 hover:bg-neutral-800">Ver no site</a>
+                  )}
+                  <a href={`${base}/${e.id}`} class="rounded-md border border-neutral-700 px-2 py-1 text-xs text-neutral-300 hover:bg-neutral-800">Editar</a>
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )}
+
+  <script is:inline>
+    const q = document.getElementById('cms-search');
+    q?.addEventListener('input', () => {
+      const term = q.value.trim().toLowerCase();
+      document.querySelectorAll('tbody tr[data-search]').forEach((tr) => {
+        tr.style.display = !term || tr.getAttribute('data-search').includes(term) ? '' : 'none';
+      });
+    });
+  </script>
+</AdminLayout>

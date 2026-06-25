@@ -1,0 +1,106 @@
+---
+export const prerender = false;
+import AdminLayout from '@/layouts/AdminLayout.astro';
+import Field from '@/components/admin/Field.astro';
+import MediaPicker from '@/components/admin/MediaPicker.astro';
+import Toast from '@/components/admin/Toast.astro';
+import { getSingletonDef } from '@/lib/cms';
+import { getSingleton } from '@/lib/singletons';
+
+const user = Astro.locals.user!;
+const { key } = Astro.params;
+const def = getSingletonDef(key!);
+if (!def) return Astro.redirect('/admin/paginas');
+
+const data = (await getSingleton<Record<string, any>>(def.key)) ?? {};
+const ok = Astro.url.searchParams.get('ok');
+const card = 'rounded-xl border border-neutral-800 bg-neutral-900/60 p-4';
+---
+
+<AdminLayout title={def.label} user={user}>
+  <div class="mb-6 flex items-center justify-between">
+    <h1 class="text-xl font-bold tracking-tight">{def.label}</h1>
+    <a href="/admin/paginas" class="text-sm text-neutral-400 hover:text-white">← Voltar</a>
+  </div>
+
+  {ok && <Toast message="Salvo." />}
+
+  <form method="POST" action="/api/admin/singleton" id="entry-form" class="space-y-5">
+    <input type="hidden" name="key" value={def.key} />
+    <div class={`${card} space-y-4`}>
+      {def.fields.map((f) => <Field field={f} value={data[f.name]} />)}
+    </div>
+
+    <div class="sticky bottom-0 z-30 -mx-6 flex items-center justify-end border-t border-neutral-800 bg-neutral-950/85 px-6 py-3 backdrop-blur">
+      <button type="submit" data-save-btn class="cursor-pointer rounded-lg bg-[#0040C8] px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#1b50d6] disabled:cursor-default disabled:opacity-60">Salvar</button>
+    </div>
+  </form>
+
+  <MediaPicker />
+</AdminLayout>
+
+<style is:global>
+  .EasyMDEContainer .CodeMirror { background: #0a0a0a; color: #e5e5e5; border-color: #404040; }
+  .editor-toolbar { background: #171717; border-color: #404040; }
+  .editor-toolbar button { color: #d4d4d4 !important; }
+  .editor-preview, .editor-preview-side { background: #0a0a0a; color: #d4d4d4; }
+</style>
+
+<script>
+  import EasyMDE from 'easymde';
+  import 'easymde/dist/easymde.min.css';
+
+  const editors: { el: HTMLTextAreaElement; mde: any }[] = [];
+  document.querySelectorAll<HTMLTextAreaElement>('textarea[data-md]').forEach((ta) => {
+    if (ta.dataset.mde) return;
+    ta.dataset.mde = '1';
+    let mde: any;
+    const imageBtn = {
+      name: 'image-library',
+      action: () => (window as any).openMediaPicker?.((url: string) => { mde.codemirror.replaceSelection(`![](${url})`); mde.codemirror.focus(); }),
+      className: 'fa fa-picture-o',
+      title: 'Inserir imagem',
+    };
+    mde = new EasyMDE({ element: ta, spellChecker: false, minHeight: '240px', toolbar: ['bold', 'italic', 'heading', '|', 'quote', 'unordered-list', 'link', imageBtn, 'preview', 'side-by-side', 'guide'] });
+    editors.push({ el: ta, mde });
+  });
+
+  document.addEventListener('click', (e) => {
+    const add = (e.target as HTMLElement).closest('[data-add]');
+    if (add) {
+      const name = add.getAttribute('data-add');
+      const tpl = document.querySelector(`template[data-tpl="${name}"]`) as HTMLTemplateElement | null;
+      const rep = document.querySelector(`[data-repeater="${name}"]`);
+      if (tpl && rep) rep.appendChild(tpl.content.cloneNode(true));
+      return;
+    }
+    const rm = (e.target as HTMLElement).closest('[data-remove]');
+    if (rm) { e.preventDefault(); (rm.closest('.row') as HTMLElement | null)?.remove(); }
+  });
+
+  function collect(rep: Element) {
+    const scalar = rep.getAttribute('data-scalar') === '1';
+    return Array.from(rep.querySelectorAll(':scope > .row'))
+      .map((row) => {
+        if (scalar) return (row.querySelector('[data-field="_value"]') as HTMLInputElement).value.trim();
+        const obj: Record<string, string> = {};
+        row.querySelectorAll('[data-field]').forEach((el) => (obj[(el as HTMLElement).getAttribute('data-field')!] = (el as HTMLInputElement).value));
+        return obj;
+      })
+      .filter((it) => (typeof it === 'string' ? it : Object.values(it).some((v) => String(v).trim())));
+  }
+
+  const form = document.getElementById('entry-form') as HTMLFormElement | null;
+  form?.addEventListener('submit', () => {
+    editors.forEach(({ el, mde }) => (el.value = mde.value()));
+    document.querySelectorAll('[data-repeater]').forEach((rep) => {
+      const hidden = form.querySelector(`input[name="${rep.getAttribute('data-repeater')}"]`) as HTMLInputElement | null;
+      if (hidden) hidden.value = JSON.stringify(collect(rep));
+    });
+    const btn = form.querySelector('[data-save-btn]') as HTMLButtonElement | null;
+    if (btn) { btn.disabled = true; btn.textContent = 'Salvando…'; }
+  });
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && (e.key === 's' || e.key === 'S')) { e.preventDefault(); form?.requestSubmit(); }
+  });
+</script>

@@ -1,0 +1,208 @@
+---
+export const prerender = false;
+import AdminLayout from '@/layouts/AdminLayout.astro';
+import Field from '@/components/admin/Field.astro';
+import MediaPicker from '@/components/admin/MediaPicker.astro';
+import Toast from '@/components/admin/Toast.astro';
+import { getCollection, siteUrl, titleOf } from '@/lib/cms';
+import { getById, listRevisions, type Entry } from '@/lib/entries';
+
+const user = Astro.locals.user!;
+const { collection, id } = Astro.params;
+const col = getCollection(collection!);
+if (!col) return Astro.redirect('/admin');
+
+const isNew = id === 'novo';
+let entry: Entry | null = null;
+let revisions: Awaited<ReturnType<typeof listRevisions>> = [];
+if (!isNew) {
+  entry = await getById(col.name, id!);
+  if (!entry) return Astro.redirect(`/admin/${col.name}`);
+  revisions = await listRevisions(col.name, entry.id);
+}
+
+const data: Record<string, any> = entry?.data ?? {};
+// defaults pra item novo
+if (isNew) for (const f of col.fields) if (data[f.name] === undefined && f.default !== undefined) data[f.name] = f.default;
+
+const draft = entry?.draft ?? true;
+const featured = entry?.featured ?? false;
+const ord = entry?.ord ?? 0;
+const slug = entry?.slug ?? '';
+const singular = col.labelSingular ?? col.label;
+const erro = Astro.url.searchParams.get('erro');
+const fmtDT = new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+const card = 'rounded-xl border border-neutral-800 bg-neutral-900/60 p-4';
+const inp =
+  'w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 outline-none transition placeholder:text-neutral-500 focus:border-[#3b6fe0] focus:ring-2 focus:ring-[#0040C8]/35';
+const lbl = 'mb-1 block text-sm font-medium text-neutral-300';
+---
+
+<AdminLayout title={isNew ? `Novo ${singular}` : titleOf(col, data)} user={user}>
+  <div class="mb-6 flex items-center justify-between">
+    <h1 class="text-xl font-bold tracking-tight">{isNew ? `Novo: ${singular}` : `Editar ${singular}`}</h1>
+    <div class="flex items-center gap-4">
+      {!isNew && siteUrl && (
+        <a href={`${siteUrl}/${col.name}/${slug}`} target="_blank" rel="noopener" class="text-sm font-medium text-[#7aa0ff] hover:underline">Ver no site ↗</a>
+      )}
+      <a href={`/admin/${col.name}`} class="text-sm text-neutral-400 hover:text-white">← Voltar</a>
+    </div>
+  </div>
+
+  {erro && <Toast type="error" message={erro === 'obrigatorio' ? 'Preencha os campos obrigatórios.' : 'Não foi possível salvar.'} />}
+
+  <form method="POST" action="/api/admin/entry" id="entry-form" class="space-y-5">
+    <input type="hidden" name="collection" value={col.name} />
+    <input type="hidden" name="id" value={isNew ? '' : entry!.id} />
+
+    <div class={`${card} space-y-4`}>
+      {col.fields.map((f) => <Field field={f} value={data[f.name]} />)}
+    </div>
+
+    <div class={`${card} grid grid-cols-1 gap-4 sm:grid-cols-2`}>
+      <div class="sm:col-span-2"><p class="text-sm font-semibold text-neutral-200">Publicação</p></div>
+      <div class="flex items-end gap-6">
+        <label class="flex items-center gap-2 text-sm text-neutral-200">
+          <input type="checkbox" name="draft" checked={draft} class="size-4 accent-[#0040C8]" /> Rascunho
+        </label>
+        {col.featurable && (
+          <label class="flex items-center gap-2 text-sm text-neutral-200">
+            <input type="checkbox" name="featured" checked={featured} class="size-4 accent-[#0040C8]" /> Destaque
+          </label>
+        )}
+      </div>
+      {col.orderable && (
+        <div><label class={lbl} for="ord">Ordem</label><input id="ord" name="ord" type="number" value={ord} class={inp} /></div>
+      )}
+      <div><label class={lbl} for="slug">Slug (URL)</label><input id="slug" name="slug" type="text" value={slug} placeholder="auto a partir do título" class={inp} /></div>
+    </div>
+
+    <!-- Barra de ações flutuante -->
+    <div class="sticky bottom-0 z-30 -mx-6 flex items-center gap-3 border-t border-neutral-800 bg-neutral-950/85 px-6 py-3 backdrop-blur">
+      <span data-save-hint class="hidden text-xs text-neutral-500 sm:block"></span>
+      <div class="ml-auto flex items-center gap-4">
+        {!isNew && (
+          <button type="submit" form="delete-form" class="cursor-pointer text-sm font-medium text-red-300 transition-colors hover:text-red-200">Excluir</button>
+        )}
+        <button type="submit" data-save-btn class="cursor-pointer rounded-lg bg-[#0040C8] px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#1b50d6] disabled:cursor-default disabled:opacity-60">
+          Salvar {singular.toLowerCase()}
+        </button>
+      </div>
+    </div>
+  </form>
+
+  {!isNew && (
+    <form id="delete-form" method="POST" action="/api/admin/entry" class="hidden" onsubmit="return confirm('Excluir definitivamente?')">
+      <input type="hidden" name="collection" value={col.name} />
+      <input type="hidden" name="id" value={entry!.id} />
+      <input type="hidden" name="acao" value="excluir" />
+    </form>
+  )}
+
+  {!isNew && revisions.length > 0 && (
+    <div class="mt-8">
+      <h2 class="mb-2 text-sm font-semibold text-neutral-200">Histórico</h2>
+      <ul class="space-y-1 text-sm text-neutral-400">
+        {revisions.map((r) => (
+          <li class="flex items-center gap-2">
+            <span class="text-neutral-500">{fmtDT.format(new Date(r.created_at))}</span>
+            <span class="font-medium text-neutral-200">{r.editor_name ?? 'alguém'}</span>
+            <span class="text-neutral-500">— {r.action}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )}
+
+  <MediaPicker />
+</AdminLayout>
+
+<style is:global>
+  .EasyMDEContainer .CodeMirror { background: #0a0a0a; color: #e5e5e5; border-color: #404040; border-bottom-left-radius: .5rem; border-bottom-right-radius: .5rem; }
+  .EasyMDEContainer .CodeMirror-cursor { border-color: #e5e5e5; }
+  .editor-toolbar { background: #171717; border-color: #404040; border-top-left-radius: .5rem; border-top-right-radius: .5rem; }
+  .editor-toolbar button { color: #d4d4d4 !important; }
+  .editor-toolbar button:hover, .editor-toolbar button.active { background: #262626; border-color: #404040; }
+  .editor-preview, .editor-preview-side { background: #0a0a0a; color: #d4d4d4; }
+  .editor-preview a, .editor-preview-side a { color: #7aa0ff; }
+  .editor-statusbar { color: #737373; }
+</style>
+
+<script>
+  import EasyMDE from 'easymde';
+  import 'easymde/dist/easymde.min.css';
+
+  const editors: { el: HTMLTextAreaElement; mde: any }[] = [];
+  document.querySelectorAll<HTMLTextAreaElement>('textarea[data-md]').forEach((ta) => {
+    if (ta.dataset.mde) return;
+    ta.dataset.mde = '1';
+    let mde: any;
+    const imageBtn = {
+      name: 'image-library',
+      action: () => (window as any).openMediaPicker?.((url: string) => {
+        mde.codemirror.replaceSelection(`![](${url})`);
+        mde.codemirror.focus();
+      }),
+      className: 'fa fa-picture-o',
+      title: 'Inserir imagem da biblioteca',
+    };
+    mde = new EasyMDE({
+      element: ta,
+      spellChecker: false,
+      status: ['lines', 'words'],
+      minHeight: '320px',
+      toolbar: ['bold', 'italic', 'heading', '|', 'quote', 'unordered-list', 'ordered-list', '|', 'link', imageBtn, 'code', 'table', '|', 'preview', 'side-by-side', 'fullscreen', '|', 'guide'],
+    });
+    editors.push({ el: ta, mde });
+  });
+
+  // Repeaters (widget list): adicionar/remover + serializar em JSON no submit.
+  document.addEventListener('click', (e) => {
+    const add = (e.target as HTMLElement).closest('[data-add]');
+    if (add) {
+      const name = add.getAttribute('data-add');
+      const tpl = document.querySelector(`template[data-tpl="${name}"]`) as HTMLTemplateElement | null;
+      const rep = document.querySelector(`[data-repeater="${name}"]`);
+      if (tpl && rep) rep.appendChild(tpl.content.cloneNode(true));
+      return;
+    }
+    const rm = (e.target as HTMLElement).closest('[data-remove]');
+    if (rm) { e.preventDefault(); (rm.closest('.row') as HTMLElement | null)?.remove(); }
+  });
+
+  function collect(rep: Element) {
+    const scalar = rep.getAttribute('data-scalar') === '1';
+    return Array.from(rep.querySelectorAll(':scope > .row'))
+      .map((row) => {
+        if (scalar) return (row.querySelector('[data-field="_value"]') as HTMLInputElement).value.trim();
+        const obj: Record<string, string> = {};
+        row.querySelectorAll('[data-field]').forEach((el) => (obj[(el as HTMLElement).getAttribute('data-field')!] = (el as HTMLInputElement).value));
+        return obj;
+      })
+      .filter((it) => (typeof it === 'string' ? it : Object.values(it).some((v) => String(v).trim())));
+  }
+
+  const form = document.getElementById('entry-form') as HTMLFormElement | null;
+  form?.addEventListener('submit', () => {
+    editors.forEach(({ el, mde }) => (el.value = mde.value()));
+    document.querySelectorAll('[data-repeater]').forEach((rep) => {
+      const hidden = form.querySelector(`input[name="${rep.getAttribute('data-repeater')}"]`) as HTMLInputElement | null;
+      if (hidden) hidden.value = JSON.stringify(collect(rep));
+    });
+  });
+
+  // Save bar: dica de status, "Salvando…" e ⌘/Ctrl+S.
+  (function () {
+    if (!form) return;
+    const btn = form.querySelector('[data-save-btn]') as HTMLButtonElement | null;
+    const hint = document.querySelector('[data-save-hint]');
+    const draft = form.querySelector('input[name="draft"]') as HTMLInputElement | null;
+    const syncHint = () => { if (hint) hint.textContent = draft && draft.checked ? 'Será salvo como rascunho — não aparece no site.' : 'Publicado — visível na API/site.'; };
+    if (draft) draft.addEventListener('change', syncHint);
+    syncHint();
+    form.addEventListener('submit', () => { if (btn) { btn.disabled = true; btn.textContent = 'Salvando…'; } });
+    document.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && (e.key === 's' || e.key === 'S')) { e.preventDefault(); form.requestSubmit(); }
+    });
+  })();
+</script>

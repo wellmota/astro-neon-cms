@@ -1,0 +1,111 @@
+---
+/**
+ * Campo de imagem do CMS: input de URL/caminho + botão de upload (Vercel Blob).
+ * O upload vai direto do navegador pro Blob e devolve uma URL pública, que é
+ * gravada no input. Também aceita colar uma URL/caminho manualmente.
+ */
+interface Props {
+  name: string;
+  label: string;
+  value?: string;
+  required?: boolean;
+  hint?: string;
+}
+const { name, label, value = '', required = false, hint } = Astro.props;
+const inp =
+  'w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 outline-none transition placeholder:text-neutral-500 focus:border-[#3b6fe0] focus:ring-2 focus:ring-[#0040C8]/35';
+---
+
+<div data-image-field>
+  <label class="mb-1 block text-sm font-medium text-neutral-300" for={name}>{label}</label>
+  <div class="flex gap-2">
+    <input
+      id={name}
+      type="text"
+      name={name}
+      value={value}
+      required={required}
+      data-url
+      placeholder="URL, /caminho ou envie um arquivo"
+      class={inp}
+    />
+    <button type="button" data-library class="shrink-0 cursor-pointer rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-xs font-medium text-neutral-300 transition-colors hover:bg-neutral-800">
+      Biblioteca
+    </button>
+    <label class="flex shrink-0 cursor-pointer items-center rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-xs font-medium text-neutral-300 transition-colors hover:bg-neutral-800">
+      <span data-btn-label>Enviar</span>
+      <input type="file" accept="image/*" data-file hidden />
+    </label>
+  </div>
+  {hint && <p class="mt-1 text-xs text-neutral-500">{hint}</p>}
+  <p data-status class="mt-1 hidden text-xs text-neutral-400"></p>
+  <div data-preview class="mt-2">
+    {value && <img src={value} alt="" class="h-16 w-auto rounded-md border border-neutral-800 object-cover" />}
+  </div>
+</div>
+
+<script>
+  import { upload } from '@vercel/blob/client';
+
+  // Define o preview via img.src (não innerHTML) pra não injetar URL crua no HTML.
+  function setPreview(preview: HTMLElement, url: string) {
+    preview.replaceChildren();
+    if (!url) return;
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = '';
+    img.className = 'h-16 w-auto rounded-md border border-neutral-800 object-cover';
+    preview.appendChild(img);
+  }
+
+  document.querySelectorAll<HTMLElement>('[data-image-field]').forEach((field) => {
+    if (field.dataset.wired) return;
+    field.dataset.wired = '1';
+
+    const fileInput = field.querySelector<HTMLInputElement>('[data-file]')!;
+    const urlInput = field.querySelector<HTMLInputElement>('[data-url]')!;
+    const preview = field.querySelector<HTMLElement>('[data-preview]')!;
+    const status = field.querySelector<HTMLElement>('[data-status]')!;
+    const btnLabel = field.querySelector<HTMLElement>('[data-btn-label]')!;
+
+    let localUrl: string | null = null;
+    fileInput.addEventListener('change', async () => {
+      const file = fileInput.files?.[0];
+      if (!file) return;
+      // Preview local IMEDIATO e estável (não depende do CDN do Blob carregar).
+      if (localUrl) URL.revokeObjectURL(localUrl);
+      localUrl = URL.createObjectURL(file);
+      setPreview(preview, localUrl);
+      status.classList.remove('hidden');
+      status.textContent = 'Enviando…';
+      btnLabel.textContent = '…';
+      try {
+        const blob = await upload(file.name, file, {
+          access: 'public',
+          handleUploadUrl: '/api/admin/upload',
+        });
+        // Salva a URL pública; o preview segue mostrando o arquivo local (mesma imagem).
+        urlInput.value = blob.url;
+        status.textContent = 'Enviado.';
+      } catch (e) {
+        status.textContent = 'Falha no upload: ' + ((e as Error)?.message ?? e);
+        setPreview(preview, urlInput.value); // volta pro que estava salvo
+      } finally {
+        btnLabel.textContent = 'Enviar';
+        fileInput.value = '';
+      }
+    });
+
+    urlInput.addEventListener('change', () => {
+      setPreview(preview, urlInput.value);
+    });
+
+    // Reusar imagem já enviada (abre a Biblioteca de mídia)
+    field.querySelector<HTMLButtonElement>('[data-library]')?.addEventListener('click', () => {
+      (window as any).openMediaPicker?.((url: string) => {
+        urlInput.value = url;
+        setPreview(preview, url);
+      });
+    });
+  });
+</script>

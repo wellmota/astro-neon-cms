@@ -1,71 +1,110 @@
-# Sveltia CMS — a UX-focused fork
+# astro-neon-cms
 
-> A friendly fork of [Sveltia CMS](https://github.com/sveltia/sveltia-cms) by **[Wellington Mota](https://github.com/wellmota)**, a product/UX designer. I use Sveltia in production and love it — this fork is where I prototype experience-level improvements and give them back to the project.
+A small, **config-driven CMS built for Astro** — old-school e-mail/password login, your content in **Postgres (Neon)**, image uploads to **Vercel Blob**, and a **public read API** your site consumes. Inspired by [Sveltia CMS](https://github.com/sveltia/sveltia-cms) / Decap, but **native to Astro** (no Git backend, no OAuth dance): you describe your content model in one config file and the admin UI + API are generated from it.
 
-Sveltia is already fast and developer-friendly. My contributions focus on the **human side** of the editing experience: the people who actually write, on the devices they actually use, increasingly with an AI sitting next to them.
+> Maintained by **[Wellington Mota](https://github.com/wellmota)** — a product/UX designer. Focus is the *human* side of editing: mobile-first, writer-friendly, AI-team-friendly.
 
-### What I'm working on
+## Why
 
-- 📱 **Mobile-first editing** — treating the phone as a primary place to write and publish, not an afterthought: comfortable tap targets, sane scrolling, and forms that hold up on a small screen.
-- ✍️ **Human-writer-friendly UI** — fewer sharp edges for non-technical authors. Clearer labels, calmer layouts, and defaults that let someone focus on the words instead of the tool.
-- ♿ **Accessibility & responsiveness** — keyboard flows, focus states, contrast, and layouts that adapt gracefully from desktop to mobile.
-- 🤖 **AI-assisted content teams** — making the CMS pleasant for teams that draft with AI: smoother paste/cleanup of generated content and an editing surface that plays well with an assistant in the loop.
+- **Config-driven** — declare collections and fields in `src/config/cms.ts`; the panel and API follow. No need to touch the engine.
+- **Real login** — e-mail/password (bcrypt via Postgres `pgcrypto`), signed session cookie. Great for non-dev teams (no GitHub account required).
+- **Decoupled** — the CMS is its own deploy. Your Astro site stays a separate project and just reads the public JSON API (build-time or runtime). No secrets needed on the site.
+- **Nice UX out of the box** — dashboard with KPIs, rich Markdown editor (live preview), media library with reuse, floating save bar, toasts, search/filter.
 
-### UX patterns I've shipped (validated in a production CMS)
+## Stack
 
-These are interaction patterns I've designed and shipped for a real editorial team, and want to bring to Sveltia. The exact code lives in a different stack, but the design intent is what I'm contributing here:
+Astro (SSR) · Neon Postgres (`@neondatabase/serverless`) · Vercel Blob · EasyMDE · Tailwind. Deploys to Vercel.
 
-- 🧷 **Floating save bar** — a sticky action bar pinned to the bottom of the editor so you can save from anywhere without scrolling. Shows live draft/published status, a "Saving…" state, and a ⌘/Ctrl+S shortcut.
-- 🔔 **Toast feedback** — non-blocking toasts (auto-dismiss + manual close) instead of inline banners that push content around.
-- 🖼️ **Media reuse everywhere** — one media library that the image fields *and* the rich-text editor both pull from: pick an existing asset (with search) or upload inline, and it's instantly available in the body.
-- 📝 **Rich Markdown editor** — toolbar + live/side-by-side preview, with the image button wired straight to the media library.
-- 📊 **Content dashboard** — a home with content KPIs, recent activity, and shortcuts, so editors land on signal instead of a raw list.
-- 🩹 **Small reliability touches** — stable image preview on upload (no flicker/revert), non-cropping data tables, and instant client-side search/filter on long lists.
+## Quick start
 
-### Roadmap (experience track)
+```bash
+pnpm install
+cp .env.example .env            # preencha DATABASE_URL, SESSION_SECRET, (BLOB_READ_WRITE_TOKEN)
 
-- [ ] **MCP integration** — let an agent (Claude or equivalent) draft, edit, and stage entries directly through the CMS via the [Model Context Protocol](https://modelcontextprotocol.io/), with the human staying in control of review and publish.
-- [ ] Refined mobile editing flows and review-on-the-go.
-- [ ] Friendlier onboarding and microcopy for non-technical authors.
+# crie o schema no seu Postgres (Neon):
+psql "$DATABASE_URL" -f schema.sql     # ou cole schema.sql no SQL editor do Neon
 
-These are personal experiments — anything that proves itself, I'd love to clean up and propose upstream. Issues and ideas are welcome.
+# crie o primeiro admin:
+pnpm seed voce@exemplo.com SuaSenhaForte "Seu Nome"
 
----
+pnpm dev                        # http://localhost:4321/admin
+```
 
-> Everything below is the upstream README, kept intact.
+`SESSION_SECRET`: gere com `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`.
 
-# Sveltia CMS
+## Defina seu conteúdo
 
-[Sveltia CMS](https://sveltiacms.app/en/) is a free, open-source, Git-based headless content management system for [Jamstack](https://jamstack.org/) sites. It’s a complete rewrite of Netlify CMS, now known as Decap CMS.
+Edite **`src/config/cms.ts`** — é o único arquivo que você precisa mexer:
 
-Designed for content editors and developers alike, Sveltia CMS delivers a modern UX/DX, powerful features, and first-class internationalization (i18n) support — all in a small, maintenance-free, single-page web application served from a CDN. Its framework-agnostic, generic-purpose approach makes it suitable for a wide range of projects, from personal blogs and portfolios to marketing sites and knowledge bases.
+```ts
+import { defineConfig } from '@/lib/config';
 
-As the de facto [successor to Netlify CMS](https://sveltiacms.app/en/docs/successor-to-netlify-cms), Sveltia CMS addresses 300+ longstanding issues while maintaining high compatibility with existing installations. It far surpasses the neglected official successor, Decap CMS. More and more projects, including a U.S. government website, are [switching from Netlify/Decap CMS](https://sveltiacms.app/en/docs/migration/netlify-decap-cms) to Sveltia CMS to enjoy its significantly improved performance, security, reliability, and experience.
+export default defineConfig({
+  siteName: 'Meu site',
+  siteUrl: 'https://exemplo.com',   // opcional, habilita "Ver no site"
+  collections: [
+    {
+      name: 'posts', label: 'Publicações', labelSingular: 'Publicação',
+      titleField: 'title', featurable: true,
+      fields: [
+        { name: 'title', label: 'Título', widget: 'string', required: true },
+        { name: 'cover', label: 'Capa', widget: 'image' },
+        { name: 'category', label: 'Categoria', widget: 'select', options: ['Geral', 'Guias'] },
+        { name: 'tags', label: 'Tags', widget: 'list' },
+        { name: 'body', label: 'Conteúdo', widget: 'markdown' },
+      ],
+    },
+  ],
+  singletons: [
+    { key: 'home', label: 'Home', fields: [{ name: 'title', label: 'Título', widget: 'string' }] },
+  ],
+});
+```
 
-It’s also a great choice for people migrating from a traditional CMS or website builder and looking for a lightweight headless CMS that can easily integrate with a static site generator (SSG) like Astro.
+**Widgets:** `string`, `text`, `markdown`, `image`, `select`, `boolean`, `number`, `datetime`, `list` (de strings, ou de objetos via `fields`). Sistema: `draft`, `featured` (se `featurable`), `ord` (se `orderable`) e `slug` são automáticos.
 
-Explore 270+ real-world examples in our [showcase](https://sveltiacms.app/en/showcase), including 100+ sites migrated from Netlify/Decap CMS and 40+ from WordPress, or visit the [documentation](https://sveltiacms.app/en/docs) to get started.
+## API pública (o que seu site consome)
 
-[![Sveltia CMS: Fast, Git-based, Headless, Modern UX, Mobile Support, I18n Support, Open Source](https://sveltiacms.app/images/highlights/cover.webp)](https://sveltiacms.app/en/)
+Conteúdo **publicado** (não-rascunho), JSON, CORS liberado:
 
-[![300 Netlify/Decap CMS issues solved in Sveltia CMS](https://sveltiacms.app/images/highlights/decap-issues.webp?20260427)](https://sveltiacms.app/en/docs/successor-to-netlify-cms)
+| Endpoint | Retorna |
+|---|---|
+| `GET /api/content/<colecao>.json` | lista de entradas (`{ slug, featured, ord, updatedAt, ...campos }`) |
+| `GET /api/content/<colecao>/<slug>.json` | uma entrada, ou `null` (404) |
+| `GET /api/content/singletons/<chave>.json` | objeto do singleton, ou `null` |
 
-[![See it in action. Visit Sveltia CMS Showcase](https://sveltiacms.app/images/highlights/showcase.webp)](https://sveltiacms.app/en/showcase)
+### Consumindo no seu site Astro
 
-## Documentation
+**Build-time (estático):**
+```ts
+const posts = await fetch('https://SEU-CMS.vercel.app/api/content/posts.json').then(r => r.json());
+```
 
-We provide comprehensive documentation to help you get started and make the most of Sveltia CMS:
+**Runtime (SSR, publica sem rebuild) — com cache de borda:**
+```ts
+export const prerender = false;
+Astro.response.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=600');
+const posts = await fetch('https://SEU-CMS.vercel.app/api/content/posts.json').then(r => r.json());
+```
+Para Markdown, renderize o campo `body` com `marked` (ou o pipeline que preferir).
 
-- [Introduction](https://sveltiacms.app/en/docs/intro): Product highlights, use cases, project goals
-- [Getting Started](https://sveltiacms.app/en/docs/start): Step-by-step setup instructions
-- [Migration Guides](https://sveltiacms.app/en/docs/migration): Instructions for migrating from other CMSs
-- [Roadmap](https://sveltiacms.app/en/docs/roadmap): Upcoming features and improvements
+## Deploy (Vercel)
 
-## Community
+1. Importe este repo num projeto Vercel.
+2. Env vars: `DATABASE_URL`, `SESSION_SECRET`, `BLOB_READ_WRITE_TOKEN` (Vercel → Storage → Blob).
+3. Deploy. Acesse `/admin`.
 
-Stay connected and get support through our community channels:
+Publicar = desmarcar **Rascunho** e salvar — aparece na API na hora (o site reflete conforme o cache que você definir).
 
-- [Bluesky](https://bsky.app/profile/sveltiacms.app): Follow us for news and updates
-- [Discord](https://discord.com/invite/5hwCGqup5b): Join the community and chat with us
-- [GitHub Discussions](https://github.com/sveltia/sveltia-cms/discussions): Ask questions and share ideas
-- [Contribute](https://github.com/sveltia/sveltia-cms/blob/main/CONTRIBUTING.md): Learn how to get involved
+## Roadmap
+
+- [ ] Mais widgets (relation/reference, object aninhado, rich list).
+- [ ] Preview da página real (iframe do site).
+- [ ] Integração MCP (agente edita via [Model Context Protocol](https://modelcontextprotocol.io/), humano aprova).
+- [ ] Papéis/permissões mais finos; i18n.
+
+Experimentos pessoais — issues e ideias são bem-vindos.
+
+## License
+
+MIT. Inspirado em [Sveltia CMS](https://github.com/sveltia/sveltia-cms) e Decap CMS.

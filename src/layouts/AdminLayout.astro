@@ -1,0 +1,93 @@
+---
+/**
+ * Shell do painel — tema escuro, menu lateral gerado a partir do config.
+ */
+import '@/styles/global.css';
+import { config } from '@/lib/cms';
+
+interface Props {
+  title?: string;
+  user?: { name: string; role: string } | null;
+  wide?: boolean;
+}
+const { title = 'Painel', user = null, wide = false } = Astro.props;
+const mainMax = wide ? 'max-w-7xl' : 'max-w-4xl';
+
+const path = Astro.url.pathname.replace(/\/$/, '') || '/';
+const nav = [
+  { label: 'Início', href: '/admin', active: path === '/admin' },
+  ...config.collections.map((c) => ({
+    label: c.label,
+    href: `/admin/${c.name}`,
+    active: path.startsWith(`/admin/${c.name}`),
+  })),
+  { label: 'Mídia', href: '/admin/midia', active: path.startsWith('/admin/midia') },
+  ...(config.singletons?.length ? [{ label: 'Páginas', href: '/admin/paginas', active: path.startsWith('/admin/paginas') }] : []),
+];
+const linkBase = 'block rounded-lg px-3 py-2 text-sm font-medium transition';
+---
+
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&display=swap" />
+    <title>{title} — CMS</title>
+    <style>
+      :global(body) { font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif; }
+    </style>
+  </head>
+  <body class="min-h-screen bg-neutral-950 text-neutral-100 antialiased">
+    {
+      user ? (
+        <div class="flex min-h-screen">
+          <aside class="hidden w-60 shrink-0 flex-col border-r border-neutral-800 bg-neutral-900/40 md:flex">
+            <a href="/admin" class="flex items-center gap-2.5 border-b border-neutral-800 px-5 py-4">
+              <span class="flex size-7 items-center justify-center rounded-md bg-[#0040C8] text-xs font-bold text-white">C</span>
+              <span class="truncate text-sm font-semibold tracking-tight text-neutral-400">{config.siteName ?? 'CMS'}</span>
+            </a>
+            <nav class="flex-1 space-y-1 p-3">
+              <p class="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wider text-neutral-600">Conteúdo</p>
+              {nav.map((item) => (
+                <a
+                  href={item.href}
+                  class={`${linkBase} ${item.active ? 'bg-[#0040C8]/15 text-white' : 'text-neutral-400 hover:bg-neutral-800/60 hover:text-neutral-100'}`}
+                >
+                  {item.label}
+                </a>
+              ))}
+            </nav>
+            <div class="border-t border-neutral-800 p-3">
+              <p class="px-3 pb-1 text-sm text-neutral-300">{user.name}</p>
+              <a href="/admin/conta" class={`${linkBase} text-neutral-400 hover:bg-neutral-800/60 hover:text-neutral-100`}>Minha conta</a>
+              <form method="POST" action="/api/admin/logout">
+                <button class={`${linkBase} w-full text-left text-neutral-400 hover:bg-neutral-800/60 hover:text-neutral-100`}>Sair</button>
+              </form>
+            </div>
+          </aside>
+
+          <div class="flex min-w-0 flex-1 flex-col">
+            <header class="flex items-center gap-4 overflow-x-auto border-b border-neutral-800 px-6 py-3 md:hidden">
+              {nav.map((item) => (
+                <a href={item.href} class={`whitespace-nowrap text-sm ${item.active ? 'text-white' : 'text-neutral-400'}`}>{item.label}</a>
+              ))}
+              <form method="POST" action="/api/admin/logout"><button class="whitespace-nowrap text-sm text-neutral-400">Sair</button></form>
+            </header>
+            <main class={`mx-auto w-full ${mainMax} flex-1 px-6 py-8`}>
+              <slot />
+            </main>
+          </div>
+        </div>
+      ) : (
+        <main class="mx-auto max-w-5xl px-6 py-8">
+          <slot />
+        </main>
+      )
+    }
+  </body>
+</html>

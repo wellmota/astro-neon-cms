@@ -1,0 +1,106 @@
+---
+/**
+ * Renderiza UM campo do config conforme o widget. Os widgets simples usam
+ * inputs nativos (lidos pelo form). `markdown` vira textarea com [data-md]
+ * (o editor liga o EasyMDE). `list` vira um repetidor serializado em JSON num
+ * hidden input (o editor serializa no submit). `image` usa o ImageField.
+ */
+import type { Field } from '@/lib/config';
+import ImageField from '@/components/admin/ImageField.astro';
+
+interface Props {
+  field: Field;
+  value: any;
+}
+const { field, value } = Astro.props;
+
+const inp =
+  'w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 outline-none transition placeholder:text-neutral-500 focus:border-[#3b6fe0] focus:ring-2 focus:ring-[#0040C8]/35';
+const lbl = 'mb-1 block text-sm font-medium text-neutral-300';
+const rmBtn = 'shrink-0 rounded-md border border-neutral-700 px-2 py-1 text-xs text-neutral-400 hover:bg-neutral-800';
+const addBtn = 'rounded-lg border border-dashed border-neutral-700 px-3 py-1.5 text-xs font-medium text-neutral-300 hover:bg-neutral-800/60';
+
+const v = value;
+const isObjectList = field.widget === 'list' && Array.isArray(field.fields) && field.fields.length > 0;
+const rows: any[] = field.widget === 'list' && Array.isArray(v) ? v : [];
+---
+
+{field.widget === 'image' ? (
+  <ImageField name={field.name} label={field.label} value={typeof v === 'string' ? v : ''} required={field.required} hint={field.hint} />
+) : (
+  <div>
+    {field.widget !== 'boolean' && <label class={lbl} for={field.name}>{field.label}</label>}
+
+    {field.widget === 'string' && (
+      <input id={field.name} name={field.name} type="text" value={v ?? ''} required={field.required} class={inp} />
+    )}
+
+    {field.widget === 'text' && (
+      <textarea id={field.name} name={field.name} rows="3" required={field.required} class={inp}>{v ?? ''}</textarea>
+    )}
+
+    {field.widget === 'markdown' && (
+      <textarea id={field.name} name={field.name} data-md rows="16" class={`${inp} font-mono leading-relaxed`}>{v ?? ''}</textarea>
+    )}
+
+    {field.widget === 'number' && (
+      <input id={field.name} name={field.name} type="number" value={v ?? ''} class={inp} />
+    )}
+
+    {field.widget === 'datetime' && (
+      <input id={field.name} name={field.name} type="date" value={typeof v === 'string' ? v.slice(0, 10) : ''} class={inp} />
+    )}
+
+    {field.widget === 'select' && (
+      <select id={field.name} name={field.name} class={inp}>
+        {(field.options ?? []).map((o) => <option value={o} selected={String(v) === o}>{o}</option>)}
+      </select>
+    )}
+
+    {field.widget === 'boolean' && (
+      <label class="flex items-center gap-2 text-sm text-neutral-200">
+        <input type="checkbox" name={field.name} checked={!!v} class="size-4 accent-[#0040C8]" />
+        {field.label}
+      </label>
+    )}
+
+    {field.widget === 'list' && (
+      <div>
+        <input type="hidden" name={field.name} />
+        <div data-repeater={field.name} data-scalar={isObjectList ? '0' : '1'} class="space-y-2">
+          {rows.map((row) => (
+            isObjectList ? (
+              <div class="row grid gap-2 rounded-lg border border-neutral-800 p-3" style={`grid-template-columns: repeat(${field.fields!.length}, 1fr) auto;`}>
+                {field.fields!.map((sf) => (
+                  <input data-field={sf.name} value={row?.[sf.name] ?? ''} placeholder={sf.label} class={inp} />
+                ))}
+                <button type="button" data-remove class={rmBtn}>✕</button>
+              </div>
+            ) : (
+              <div class="row flex gap-2">
+                <input data-field="_value" value={typeof row === 'string' ? row : ''} class={inp} />
+                <button type="button" data-remove class={rmBtn}>✕</button>
+              </div>
+            )
+          ))}
+        </div>
+        <template data-tpl={field.name}>
+          {isObjectList ? (
+            <div class="row grid gap-2 rounded-lg border border-neutral-800 p-3" style={`grid-template-columns: repeat(${field.fields!.length}, 1fr) auto;`}>
+              {field.fields!.map((sf) => <input data-field={sf.name} placeholder={sf.label} class={inp} />)}
+              <button type="button" data-remove class={rmBtn}>✕</button>
+            </div>
+          ) : (
+            <div class="row flex gap-2">
+              <input data-field="_value" class={inp} />
+              <button type="button" data-remove class={rmBtn}>✕</button>
+            </div>
+          )}
+        </template>
+        <button type="button" data-add={field.name} class={`${addBtn} mt-2`}>+ Adicionar</button>
+      </div>
+    )}
+
+    {field.hint && field.widget !== 'boolean' && <p class="mt-1 text-xs text-neutral-500">{field.hint}</p>}
+  </div>
+)}

@@ -1,0 +1,47 @@
+---
+export const prerender = false;
+import AdminLayout from '@/layouts/AdminLayout.astro';
+import { config } from '@/lib/cms';
+
+const error = Astro.url.searchParams.get('erro');
+const inputCls =
+  'w-full rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2.5 text-sm text-neutral-100 outline-none transition placeholder:text-neutral-500 focus:border-[#3b6fe0] focus:ring-2 focus:ring-[#0040C8]/35';
+---
+
+<AdminLayout title="Entrar">
+  <div class="mx-auto mt-12 max-w-sm sm:mt-20">
+    <div class="rounded-2xl border border-neutral-800 bg-neutral-900/60 p-8 shadow-xl shadow-black/30">
+      <div class="mb-7 flex flex-col items-center text-center">
+        <span class="flex size-12 items-center justify-center rounded-xl bg-[#0040C8] text-lg font-bold text-white">C</span>
+        <h1 class="mt-4 text-lg font-bold tracking-tight text-white">{config.siteName ?? 'Painel de conteúdo'}</h1>
+        <p class="mt-1 text-sm text-neutral-400">Entre para gerenciar o conteúdo.</p>
+      </div>
+
+      {
+        error && (
+          <p class="mb-4 rounded-lg border border-red-900/60 bg-red-950/50 px-3 py-2 text-sm text-red-300">
+            E-mail ou senha incorretos.
+          </p>
+        )
+      }
+
+      <form method="POST" action="/api/admin/login" class="space-y-4">
+        <div>
+          <label class="mb-1 block text-sm font-medium text-neutral-300" for="email">E-mail</label>
+          <input id="email" name="email" type="email" required autocomplete="username" class={inputCls} />
+        </div>
+        <div>
+          <label class="mb-1 block text-sm font-medium text-neutral-300" for="senha">Senha</label>
+          <input id="senha" name="senha" type="password" required autocomplete="current-password" class={inputCls} />
+        </div>
+        <button
+          type="submit"
+          class="w-full cursor-pointer rounded-lg bg-[#0040C8] px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1b50d6]"
+        >
+          Entrar
+        </button>
+      </form>
+    </div>
+    <p class="mt-6 text-center text-xs text-neutral-500">Acesso restrito.</p>
+  </div>
+</AdminLayout>
